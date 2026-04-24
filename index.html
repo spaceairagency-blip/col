@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nexus Sync Control | SIR</title>
+    <style>
+        :root { 
+            --bg-color: #121212; 
+            --accent: #FFD700; 
+            --glass: rgba(255, 255, 255, 0.1);
+        }
+        
+        body { 
+            margin: 0; padding: 0; 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-color); 
+            color: white;
+            transition: background 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+            height: 100vh; display: flex; 
+            justify-content: center; align-items: center;
+            overflow: hidden;
+        }
+
+        .glass-container {
+            background: var(--glass);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            padding: 40px;
+            border-radius: 30px;
+            text-align: center;
+            box-shadow: 0 15px 35px rgba(0,0,0,0.5);
+            width: 85%; max-width: 400px;
+        }
+
+        h1 { font-size: 1.5rem; margin-bottom: 25px; letter-spacing: 2px; color: var(--accent); }
+
+        .control-group { margin-bottom: 20px; }
+
+        input[type="color"] {
+            -webkit-appearance: none; border: none;
+            width: 100px; height: 100px; cursor: pointer;
+            background: none; transition: transform 0.3s;
+        }
+
+        input[type="color"]::-webkit-color-swatch-wrapper { padding: 0; }
+        input[type="color"]::-webkit-color-swatch {
+            border: 3px solid var(--accent); border-radius: 50%;
+        }
+
+        input[type="color"]:hover { transform: scale(1.1); }
+
+        .btn-group { display: flex; flex-direction: column; gap: 15px; }
+
+        button {
+            background: var(--glass); color: white;
+            border: 1px solid var(--accent); padding: 12px;
+            border-radius: 12px; cursor: pointer; font-weight: bold;
+            transition: 0.3s; text-transform: uppercase;
+        }
+
+        button:hover { background: var(--accent); color: black; }
+
+        #preview-img {
+            width: 100%; max-height: 150px; object-fit: cover;
+            border-radius: 15px; margin-top: 15px; display: none;
+            border: 1px solid var(--accent);
+        }
+
+        /* Fullscreen Image Overlay */
+        #fsOverlay {
+            display: none; position: fixed; top: 0; left: 0;
+            width: 100%; height: 100%; background-size: cover;
+            background-position: center; z-index: 9999;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="glass-container" id="ui">
+        <h1>COMMAND CENTER</h1>
+        
+        <div class="control-group">
+            <input type="color" id="colorPicker" title="Pick a color to sync">
+        </div>
+
+        <div class="btn-group">
+            <input type="file" id="fileInput" accept="image/*" style="display:none">
+            <button onclick="document.getElementById('fileInput').click()">Upload Image</button>
+            <button id="fsBtn">Enter Fullscreen</button>
+        </div>
+
+        <img id="preview-img" src="" alt="Preview">
+    </div>
+
+    <div id="fsOverlay"></div>
+
+    <script>
+        const webAppUrl = "https://script.google.com/macros/s/AKfycbzF688LQuKPWyI0hYxGZT7pd9r3sWE5j5tYGbrbH1X5cNxvoC6rHLYETreutFLX27n3Ag/exec";
+        const colorPicker = document.getElementById('colorPicker');
+        const fileInput = document.getElementById('fileInput');
+        const fsOverlay = document.getElementById('fsOverlay');
+        const fsBtn = document.getElementById('fsBtn');
+
+        // Laptop/Control: Sync color on change
+        colorPicker.addEventListener('change', (e) => {
+            const color = e.target.value;
+            document.body.style.backgroundColor = color;
+            fetch(`${webAppUrl}?action=updateColor&color=${encodeURIComponent(color)}`, { mode: 'no-cors' });
+        });
+
+        // Image Upload Logic
+        fileInput.addEventListener('change', function() {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const base64 = e.target.result;
+                document.getElementById('preview-img').src = base64;
+                document.getElementById('preview-img').style.display = 'block';
+                
+                // GAS-e image pathano
+                google.script.run.uploadImage(base64); 
+            };
+            reader.readAsDataURL(this.files[0]);
+        });
+
+        // Polling (Mobile/Live Sync) - Protik 2 second e check korbe
+        function checkSync() {
+            google.script.run.withSuccessHandler(function(data) {
+                if (data.color) {
+                    document.body.style.backgroundColor = data.color;
+                    colorPicker.value = data.color;
+                }
+                if (data.imageUrl) {
+                    fsOverlay.style.backgroundImage = `url(${data.imageUrl})`;
+                }
+            }).getAppData();
+        }
+
+        setInterval(checkSync, 2000);
+
+        // Fullscreen Toggle
+        fsBtn.addEventListener('click', () => {
+            fsOverlay.style.display = 'block';
+            if (document.documentElement.requestFullscreen) {
+                document.documentElement.requestFullscreen();
+            }
+        });
+
+        fsOverlay.addEventListener('click', () => {
+            fsOverlay.style.display = 'none';
+            if (document.exitFullscreen) {
+                document.exitFullscreen();
+            }
+        });
+
+    </script>
+</body>
+</html>
